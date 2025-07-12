@@ -1,0 +1,101 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Airport {
+  id        String   @id @default(cuid())
+  icaoCode  String?  @unique // ICAO code like "KLAX"
+  iataCode  String?  @unique // IATA code like "LAX"
+  name      String
+  city      String
+  country   String
+  latitude  Float
+  longitude Float
+  altitude  Int?     // Altitude in meters
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  departureFlights Flight[] @relation("DepartureAirport")
+  arrivalFlights   Flight[] @relation("ArrivalAirport")
+
+  @@index([iataCode])
+  @@index([icaoCode])
+  @@index([name])
+  @@index([city])
+  @@index([country])
+}
+
+model Flight {
+  id                String    @id @default(cuid())
+  flightNumber      String?
+  airline           String?
+  aircraftType      String?
+  aircraftRegistration String?
+  seatNumber        String?
+  flightClass       String?   // Economy, Premium Economy, Business, First
+  reason            String?   // Business, Leisure, Transit
+  comments          String?
+  departureTime     DateTime
+  arrivalTime       DateTime
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Airport relations
+  departureAirportId String
+  arrivalAirportId   String
+  departureAirport   Airport @relation("DepartureAirport", fields: [departureAirportId], references: [id])
+  arrivalAirport     Airport @relation("ArrivalAirport", fields: [arrivalAirportId], references: [id])
+
+  // Relations
+  images FlightImage[]
+}
+
+model FlightImage {
+  id        String   @id @default(cuid())
+  filename  String
+  url       String
+  caption   String?
+  createdAt DateTime @default(now())
+
+  // Relations
+  flightId String
+  flight   Flight @relation(fields: [flightId], references: [id], onDelete: Cascade)
+}
+
+model Country {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  code      String   @unique // ISO 3166-1 alpha-2 code
+  visitedAt DateTime
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  cities City[]
+}
+
+model City {
+  id        String   @id @default(cuid())
+  name      String
+  latitude  Float?
+  longitude Float?
+  visitedAt DateTime
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  countryId String
+  country   Country @relation(fields: [countryId], references: [id])
+}
