@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { MapPin, Plane, Globe, Calendar, Settings } from 'lucide-react'
+import { MapPin, Plane, Globe, Calendar, Settings, Route } from 'lucide-react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import Timeline from '@/components/Timeline'
+import FlightTimeline from '@/components/FlightTimeline'
 
 // Dynamically import MapView to avoid SSR issues
 const MapView = dynamic(() => import('@/components/MapView'), {
@@ -87,6 +88,38 @@ export default function Home() {
     return flightDate >= startDate && flightDate <= endDate
   })
 
+  // Calculate great circle distance between two points
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const toRadians = (degrees: number) => degrees * Math.PI / 180
+    const R = 6371 // Earth's radius in kilometers
+    
+    const lat1Rad = toRadians(lat1)
+    const lon1Rad = toRadians(lon1)
+    const lat2Rad = toRadians(lat2)
+    const lon2Rad = toRadians(lon2)
+    
+    const deltaLat = lat2Rad - lat1Rad
+    const deltaLon = lon2Rad - lon1Rad
+    
+    const a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+              Math.cos(lat1Rad) * Math.cos(lat2Rad) *
+              Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2)
+    const angularDistance = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    
+    return R * angularDistance
+  }
+
+  // Calculate total distance
+  const totalDistance = filteredFlights.reduce((total, flight) => {
+    const distance = calculateDistance(
+      flight.departureAirport.latitude,
+      flight.departureAirport.longitude,
+      flight.arrivalAirport.latitude,
+      flight.arrivalAirport.longitude
+    )
+    return total + distance
+  }, 0)
+
   const stats = {
     totalFlights: filteredFlights.length,
     uniqueAirports: new Set([
@@ -96,7 +129,8 @@ export default function Home() {
     uniqueCountries: new Set([
       ...filteredFlights.map(f => f.departureAirport.country),
       ...filteredFlights.map(f => f.arrivalAirport.country)
-    ]).size
+    ]).size,
+    totalDistance: Math.round(totalDistance)
   }
 
   if (loading) {
@@ -171,6 +205,18 @@ export default function Home() {
                   </div>
                 </div>
               </div>
+
+              <div className="bg-gray-800 rounded-lg shadow-sm border border-gray-700 p-4">
+                <div className="flex items-center">
+                  <div className="p-2 bg-orange-900 rounded-full">
+                    <Route className="h-5 w-5 text-orange-400" />
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-gray-400">Total Distance</p>
+                    <p className="text-xl font-bold text-white">{stats.totalDistance.toLocaleString()} km</p>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Controls */}
@@ -208,8 +254,9 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Right Side - Bigger Map */}
-          <div className="lg:col-span-3">
+          {/* Right Side - Map and Timeline */}
+          <div className="lg:col-span-3 space-y-6">
+            {/* Map */}
             <div className="bg-gray-800 rounded-lg shadow-sm border border-gray-700 p-6">
               <h3 className="text-lg font-semibold mb-4 text-white">Flight Map</h3>
               <div className="h-[600px]">
@@ -221,6 +268,14 @@ export default function Home() {
                 />
               </div>
             </div>
+
+            {/* Flight Timeline */}
+            <FlightTimeline
+              flights={flights}
+              startDate={startDate}
+              endDate={endDate}
+              onDateRangeChange={handleDateRangeChange}
+            />
           </div>
         </div>
 
