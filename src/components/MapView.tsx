@@ -2,8 +2,61 @@
 
 import { useEffect, useState } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet'
+import { useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
+import 'leaflet.geodesic'
 import L from 'leaflet'
+
+// Extend L namespace for geodesic
+declare module 'leaflet' {
+  namespace L {
+    function geodesic(latlngs: [number, number][][], options?: any): any
+  }
+}
+
+// Custom component for geodesic lines
+function GeodesicPolyline({ 
+  start, 
+  end, 
+  color = "#3B82F6", 
+  weight = 3, 
+  opacity = 0.8,
+  children 
+}: { 
+  start: [number, number], 
+  end: [number, number], 
+  color?: string, 
+  weight?: number, 
+  opacity?: number,
+  children?: React.ReactNode 
+}) {
+  const map = useMap()
+  
+  useEffect(() => {
+    const geodesicLine = L.geodesic([
+      [start, end]
+    ], {
+      weight: weight,
+      steps: 2000,
+      color: color,
+      opacity: opacity
+    }).addTo(map)
+    
+    // Add popup if children provided
+    if (children) {
+      const popupContent = document.createElement('div')
+      // This is a simplified approach - you might want to use ReactDOM.render for complex content
+      popupContent.innerHTML = typeof children === 'string' ? children : ''
+      geodesicLine.bindPopup(popupContent)
+    }
+    
+    return () => {
+      map.removeLayer(geodesicLine)
+    }
+  }, [map, start, end, color, weight, opacity, children])
+  
+  return null
+}
 
 // Fix for default markers
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -12,6 +65,27 @@ L.Icon.Default.mergeOptions({
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 })
+
+// Function to calculate great circle distance in kilometers (kept for reference)
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const toRadians = (degrees: number) => degrees * Math.PI / 180
+  const R = 6371 // Earth's radius in kilometers
+  
+  const lat1Rad = toRadians(lat1)
+  const lon1Rad = toRadians(lon1)
+  const lat2Rad = toRadians(lat2)
+  const lon2Rad = toRadians(lon2)
+  
+  const deltaLat = lat2Rad - lat1Rad
+  const deltaLon = lon2Rad - lon1Rad
+  
+  const a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+            Math.cos(lat1Rad) * Math.cos(lat2Rad) *
+            Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2)
+  const angularDistance = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  
+  return R * angularDistance
+}
 
 interface Flight {
   id: string
@@ -97,31 +171,22 @@ export default function MapView({ flights, showFlights, showAirports, showCountr
         ))}
 
         {/* Flight paths */}
-        {showFlights && flights.map((flight) => (
-          <Polyline
-            key={flight.id}
-            positions={[
-              [flight.departureAirport.latitude, flight.departureAirport.longitude],
-              [flight.arrivalAirport.latitude, flight.arrivalAirport.longitude]
-            ]}
-            color="#3B82F6"
-            weight={2}
-            opacity={0.7}
-          >
-            <Popup>
-              <div className="font-medium">
-                {flight.flightNumber && `${flight.flightNumber} - `}
-                {flight.airline}
-              </div>
-              <div className="text-sm">
-                {flight.departureAirport.code} → {flight.arrivalAirport.code}
-              </div>
-              <div className="text-xs text-gray-500">
-                {new Date(flight.departureTime).toLocaleDateString()}
-              </div>
-            </Popup>
-          </Polyline>
-        ))}
+        {showFlights && flights.map((flight) => {          
+          return (
+            <GeodesicPolyline
+              key={flight.id}
+              start={[flight.departureAirport.latitude, flight.departureAirport.longitude]}
+              end={[flight.arrivalAirport.latitude, flight.arrivalAirport.longitude]}
+              color="#3B82F6"
+              weight={3}
+              opacity={0.8}
+            >
+              {`${flight.flightNumber ? flight.flightNumber + ' - ' : ''}${flight.airline}<br/>
+               ${flight.departureAirport.code} → ${flight.arrivalAirport.code}<br/>
+               ${new Date(flight.departureTime).toLocaleDateString()}`}
+            </GeodesicPolyline>
+          )
+        })}
       </MapContainer>
     </div>
   )
