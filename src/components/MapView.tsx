@@ -144,7 +144,7 @@ export default function MapView({ flights, showFlights, showAirports, showCountr
   }, [] as Flight['departureAirport'][])
 
   return (
-    <div className="w-full h-96 rounded-lg overflow-hidden">
+    <div className="w-full h-full rounded-lg overflow-hidden">
       <MapContainer
         center={[20, 0]}
         zoom={2}
@@ -154,6 +154,7 @@ export default function MapView({ flights, showFlights, showAirports, showCountr
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          className="brightness-75 contrast-125 hue-rotate-180 invert"
         />
         
         {/* Airport markers */}
